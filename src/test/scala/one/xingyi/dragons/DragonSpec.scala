@@ -14,6 +14,7 @@ class DragonSpec extends AnyFlatSpec with should.Matchers {
 
   behavior of "Dragon.damage"
 
+
   it should "create a new dragon with the hitpoints reduced by the damage" in {
     def attack(d: Dragon, damage: Int): Dragon = {
       val AttackResult(dragon, result) = d.damage(damage)
@@ -37,17 +38,27 @@ class DragonSpec extends AnyFlatSpec with should.Matchers {
     kill(Dragon(1000), 10000) shouldBe Dragon.dead
   }
 
-  def validate(d: Dragon, damage: Int) = {
-    val AttackResult(dragon, result) = d.damage(damage)
-    result shouldBe Combat.dragonError
-    dragon
-  }
-  it should "validate the dragon is alive" in {
-    validate(Dragon.dead, 100) shouldBe Dragon.dead
+  behavior of "Attack validation"
+  def validate(d: Dragon, damage: Int) = implicitly[Validation[Attack]].apply(Attack(d, damage))
+
+  it should "validate the dragon needs to be alive" in {
+    validate(Dragon(), 100) shouldBe List()
+    validate(Dragon.dead, 100) shouldBe List(Combat.dragonAlreadyDead)
   }
   it should "validate the damage is positive" in {
-    validate(Dragon(100), -1) shouldBe Dragon(100)
-    validate(Dragon(1000), -100) shouldBe Dragon(1000)
+    validate(Dragon(100), -1) shouldBe List(Combat.attackCannotHaveNegativeDamage)
+    validate(Dragon(1000), -100) shouldBe List(Combat.attackCannotHaveNegativeDamage)
+  }
+
+  behavior of "Logging message"
+
+  it should "have a nice message for all cases" in {
+    val message = implicitly[LoggerMessage[Attack, AttackResult]]
+    message(Attack(Dragon(), 100), AttackResult(Dragon(), Combat.dragonDamaged)) shouldBe "The dragon was hit for 100 damage, It has 1,000 hitpoints left"
+    message(Attack(Dragon(), 100), AttackResult(Dragon(), Combat.dragonKilled)) shouldBe "The dragon was hit for 100 damage and is now dead!"
+    message(Attack(Dragon(), -100), AttackResult(Dragon(), Combat.attackCannotHaveNegativeDamage)) shouldBe "It is not possible to attack for -ve damage. The amount was -100"
+    message(Attack(Dragon(), 100), AttackResult(Dragon(), Combat.dragonAlreadyDead)) shouldBe "The dragon was already dead when attacked for 100"
+
   }
 
 }
