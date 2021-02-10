@@ -37,11 +37,26 @@ object ImplicitsExample3 {
   implicit def someNameThatDoesntMatter: String = "4"
   implicit def someNameThatAlsoDoesntMatter: String = "4"
   //  println(implicitly[String])  // doesn't compile because there are two implicits in scope
+
 }
 
 
 class MyThing[T](implicit logMessageFn: T => String ){
   def doSomething(t: T) = println(logMessageFn(t))
-  implicit val MessageFunctionForString: Int => String = t => t.toString
-  implicit val MessageFunctionForInt: String => String = t => t
+}
+
+object MyThing{
+
+  def use[T](t: T)(implicit logMessageFn: T => String): Unit ={
+    println(logMessageFn(t))
+  }
+
+  implicit def defaultMessageFn[T]: T => String = t => t.toString  //we can define defaults
+  implicit val MessageFunctionForString: String => String = t => t  // we can be more precise if we want to be
+  implicit val MessageFunctionForInt: Int => String = t => t.toString
+
+  use(1)
+  use("one")
+  use(1.0)
+
 }

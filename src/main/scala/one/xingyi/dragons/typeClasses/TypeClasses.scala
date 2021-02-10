@@ -1,5 +1,6 @@
 package one.xingyi.dragons.typeClasses
 
+//A type class or a flyweight pattern
 trait ToJson[T] {
   def apply(t: T): String
 }
@@ -7,6 +8,8 @@ trait ToJson[T] {
 object ToJson {
   implicit val toJsonForInt: ToJson[Int] = _.toString
   implicit val toJsonForString: ToJson[String] = '"' + _.toString + '"'
+
+  //This is just a helper method to help me call it
   def apply[T](t: T)(implicit toJson: ToJson[T]): String = toJson(t)
 }
 

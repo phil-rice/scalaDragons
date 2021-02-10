@@ -11,11 +11,11 @@ case class Thing(name: String) extends ToJson {
 }
 
 object ToJsonApp {
+
   val s: String = "someString"
+  val i: Int = 3
 
-  //How do I modify String and Int so that they implement toJson
-  //How do I implement two versions of toJson for version1 and version2 of the api?
-
+  //so try and add toJson to these strings and ints
 
 }
 

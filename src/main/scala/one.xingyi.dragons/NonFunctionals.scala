@@ -69,6 +69,7 @@ object NonFunctionals {
       case Nil => raw(from)
       case failures => failedValidation(from, failures)
     }
+
   def compose[From, To](fns: Delegate[From, To]*): NonFunctionals[From, To] =
     raw => fns.foldLeft(raw)((acc, fn) => fn(acc))
 

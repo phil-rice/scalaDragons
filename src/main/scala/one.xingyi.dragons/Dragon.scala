@@ -1,5 +1,6 @@
 package one.xingyi.dragons
 import one.xingyi.dragons.Combat.{dragonDamaged, dragonKilled}
+import one.xingyi.dragons.NonFunctionals.{compose, error, logging, metrics, validate}
 
 import java.text.MessageFormat
 
@@ -18,10 +19,12 @@ case class Attack(dragon: Dragon, damage: Int)
 object Attack {
   val validateDragonAlive: Validation[Attack] = Validation[Attack](_.dragon.alive, Combat.dragonAlreadyDead)
   val validatePostiveDamage: Validation[Attack] = Validation[Attack](_.damage >= 0, Combat.attackCannotHaveNegativeDamage)
+
   implicit val validationForAttack: Validation[Attack] = Validation.compose(validateDragonAlive, validatePostiveDamage)
 }
 
 case class AttackResult(dragon: Dragon, result: String)
+
 object AttackResult {
   implicit def metricsName: MetricsName[AttackResult] = a => a.result
 
@@ -29,7 +32,7 @@ object AttackResult {
     (at, res) => MessageFormat.format(LoggerMessage.pattern(res.result), at.damage, res.dragon.hitPoints, res.dragon)
 
   implicit val failedValidation: FailedValidation[Attack, AttackResult] =
-    (from: Attack, list: List[String]) => AttackResult(from.dragon, list.head)
+    (from: Attack, errors: List[String]) => AttackResult(from.dragon, errors.head)
 }
 
 object Combat {
@@ -47,6 +50,8 @@ class AttackService(implicit attackNonFunctionals: NonFunctionals[Attack, Attack
 object DragonApp extends App {
   implicit val putMetrics = new MapPutMetrics
   implicit val logger = PrintlnLogger
+
+  implicit val attackNonFunctionals = compose[Attack, AttackResult](logging, metrics, error, validate)
 
   val combatService = new AttackService
 
