@@ -42,8 +42,8 @@ object Combat {
   val dragonKilled = "dragon.killed"
 }
 
-class AttackService(implicit attackNonFunctionals: NonFunctionals[Attack, AttackResult]) {
-  val attack = attackNonFunctionals(attack => attack.dragon.damage(attack.damage))
+class AttackService(rawAttack: Attack => AttackResult)(implicit attackNonFunctionals: NonFunctionals[Attack, AttackResult]) {
+  val attack = attackNonFunctionals(rawAttack)
 }
 
 
@@ -51,9 +51,9 @@ object DragonApp extends App {
   implicit val putMetrics = new MapPutMetrics
   implicit val logger = PrintlnLogger
 
-  implicit val attackNonFunctionals = compose[Attack, AttackResult](logging, metrics, error, validate)
+  implicit val attackNonFunctionals = compose[Attack, AttackResult](logging, metrics, error,  validate)
 
-  val combatService = new AttackService
+  val combatService = new AttackService(rawAttack = attack => attack.dragon.damage(attack.damage))
 
   combatService.attack(Attack(Dragon(), 100))
 

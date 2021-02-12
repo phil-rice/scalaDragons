@@ -50,7 +50,7 @@ class DragonSpec extends AnyFlatSpec with should.Matchers {
     validate(Dragon(1000), -100) shouldBe List(Combat.attackCannotHaveNegativeDamage)
   }
 
-  behavior of "Logging message"
+  behavior of "Attack Logging message"
 
   it should "have a nice message for all cases" in {
     val message = implicitly[LoggerMessage[Attack, AttackResult]]
@@ -60,5 +60,12 @@ class DragonSpec extends AnyFlatSpec with should.Matchers {
     message(Attack(Dragon(), 100), AttackResult(Dragon(), Combat.dragonAlreadyDead)) shouldBe "The dragon was already dead when attacked for 100"
 
   }
+
+  behavior of "Attack Metrics Name"
+  it should "have a metrics name" in {
+    val metricsName = implicitly[MetricsName[AttackResult]]
+    metricsName(AttackResult(Dragon(), "someName")) shouldBe "someName"
+  }
+
 
 }

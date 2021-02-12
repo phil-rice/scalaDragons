@@ -4,13 +4,9 @@ import java.util.concurrent.atomic.AtomicInteger
 
 trait LoggerMessage[From, To] extends ((From, To) => String)
 
-
 object LoggerMessage {
   val resources = ResourceBundle.getBundle("logging")
   def pattern(s: String) = resources.getString(s)
-}
-object LoggerParams {
-  def apply[From, To](from: From, to: To)(implicit loggerMessage: LoggerMessage[From, To]): String = loggerMessage(from, to)
 }
 trait Logger {
   def message(s: String)
@@ -50,28 +46,40 @@ object ErrorStrategy {
 
 trait NonFunctionals[From, To] extends ((From => To) => (From => To))
 object NonFunctionals {
-  type Delegate[From, To] = (From => To) => (From => To)
 
-  def doWithSideeffect[From, To](sideeffect: (From, To) => Unit): Delegate[From, To] = //
-  { raw => from => val to = raw(from); sideeffect(from, to); to }
 
-  def logging[From, To](implicit logger: Logger, loggerMessage: LoggerMessage[From, To]): Delegate[From, To] =
+  type DecoratorFn[From, To] = (From => To) => (From => To)
+
+
+  def doWithSideeffect[From, To](sideeffect: (From, To) => Unit): DecoratorFn[From, To] = //
+  { originalFn =>
+    from =>
+      val to = originalFn(from);
+      sideeffect(from, to);
+      to
+  }
+
+  def logging[From, To](implicit logger: Logger, loggerMessage: LoggerMessage[From, To]): DecoratorFn[From, To] =
     doWithSideeffect[From, To]((from, to) => logger.message(loggerMessage(from, to)))
 
-  def metrics[From, To: MetricsName](implicit putMetrics: PutMetrics): Delegate[From, To] =
+  def metrics[From, To: MetricsName](implicit putMetrics: PutMetrics): DecoratorFn[From, To] =
     doWithSideeffect[From, To]((from, to) => putMetrics.addOne(to))
 
-  def error[From, To](implicit errorStrategy: ErrorStrategy[From, To]): Delegate[From, To] =
-    raw => from => try {raw(from) } catch {case e: Exception => errorStrategy(from, e)}
+  def error[From, To](implicit errorStrategy: ErrorStrategy[From, To]): DecoratorFn[From, To] =
+    raw => from =>
+      try {
+        raw(from)
+      } catch {case e: Exception => errorStrategy(from, e)}
 
-  def validate[From, To](implicit validation: Validation[From], failedValidation: FailedValidation[From, To]): Delegate[From, To] =
+  def validate[From, To](implicit validation: Validation[From], failedValidation: FailedValidation[From, To]): DecoratorFn[From, To] =
     raw => from => validation(from) match {
       case Nil => raw(from)
       case failures => failedValidation(from, failures)
     }
 
-  def compose[From, To](fns: Delegate[From, To]*): NonFunctionals[From, To] =
+  def compose[From, To](fns: DecoratorFn[From, To]*): NonFunctionals[From, To] =
     raw => fns.foldLeft(raw)((acc, fn) => fn(acc))
+
 
   implicit def nonFunctionals[From: Validation, To: MetricsName](implicit
                                                                  putMetrics: PutMetrics,
