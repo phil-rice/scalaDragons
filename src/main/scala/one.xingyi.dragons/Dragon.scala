@@ -1,63 +1,45 @@
 package one.xingyi.dragons
-import one.xingyi.dragons.Combat.{dragonDamaged, dragonKilled}
-import one.xingyi.dragons.NonFunctionals.{compose, error, logging, metrics, validate}
 
-import java.text.MessageFormat
 
-object Dragon {
-  val dead = Dragon(0, alive = false)
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.logging.{Level, Logger}
+
+
+object Dragon1 extends App {
+  private[dragons] val logger = Logger.getLogger("Dragon1")
+  private[dragons] val damageCount = new AtomicInteger
+  def counts: Int = damageCount.get
+  var freshDragon = new Dragon1(1000, true)
+
+  System.out.println("Killing Dragons for Fun and Profit")
+  val d1 = Dragon1.freshDragon
+  val d2 = d1.damage(100)
+  val d3 = d2.damage(100)
+  val d4 = d2.damage(900)
+  for (d <- List(d1, d2, d3, d4)) {println(d) }
+  println("Your dragon is " + (if (d4.alive) "alive" else "dead"))
+  println()
+  println("Metrics are: ")
+  println(Dragon1.damageCount.get)
 }
+case class Dragon1(hitpoints: Int = 1000, alive: Boolean = true) {
+  private[dragons] def isDead = !alive
 
-case class Dragon(hitPoints: Int = 1000, alive: Boolean = true) {
-  def damage(damage: Int): AttackResult = hitPoints - damage match {
-    case hp if hp <= 0 => AttackResult(Dragon.dead, dragonKilled)
-    case hp => AttackResult(copy(hitPoints = hp), dragonDamaged)
+  def damage(damage: Int): Dragon1 = try {
+    if (damage <= 0 || isDead) return this
+    val newHitpoints = hitpoints - damage
+    if (newHitpoints <= 0) {
+      Dragon1.logger.info("dragon was hit for " + damage + " and is now DEAD!")
+      new Dragon1(0, false)
+    }
+    else {
+      Dragon1.damageCount.incrementAndGet
+      Dragon1.logger.info("damage dragon for " + damage + "hitpoints. Hitpoints now" + newHitpoints)
+      new Dragon1(newHitpoints, alive)
+    }
+  } catch {
+    case e: RuntimeException =>
+      Dragon1.logger.log(Level.SEVERE, "Unexpected error damaging " + this + " for " + damage + " hitpoints", e)
+      throw e
   }
-}
-
-case class Attack(dragon: Dragon, damage: Int)
-object Attack {
-  val validateDragonAlive: Validation[Attack] = Validation[Attack](_.dragon.alive, Combat.dragonAlreadyDead)
-  val validatePostiveDamage: Validation[Attack] = Validation[Attack](_.damage >= 0, Combat.attackCannotHaveNegativeDamage)
-
-  implicit val validationForAttack: Validation[Attack] = Validation.compose(validateDragonAlive, validatePostiveDamage)
-}
-
-case class AttackResult(dragon: Dragon, result: String)
-
-object AttackResult {
-  implicit def metricsName: MetricsName[AttackResult] = a => a.result
-
-  implicit val loggerMessage: LoggerMessage[Attack, AttackResult] =
-    (at, res) => MessageFormat.format(LoggerMessage.pattern(res.result), at.damage, res.dragon.hitPoints, res.dragon)
-
-  implicit val failedValidation: FailedValidation[Attack, AttackResult] =
-    (from: Attack, errors: List[String]) => AttackResult(from.dragon, errors.head)
-}
-
-object Combat {
-  val dragonAlreadyDead = "dragon.error.alreadyDeadWhenAttacked"
-  val attackCannotHaveNegativeDamage = "dragon.error.cannotHaveNegativeDamage"
-  val dragonDamaged = "dragon.damaged"
-  val dragonKilled = "dragon.killed"
-}
-
-class AttackService(rawAttack: Attack => AttackResult)(implicit attackNonFunctionals: NonFunctionals[Attack, AttackResult]) {
-  val attack = attackNonFunctionals(rawAttack)
-}
-
-
-object DragonApp extends App {
-  implicit val putMetrics = new MapPutMetrics
-  implicit val logger = PrintlnLogger
-
-  implicit val attackNonFunctionals = compose[Attack, AttackResult](logging, metrics, error,  validate)
-
-  val combatService = new AttackService(rawAttack = attack => attack.dragon.damage(attack.damage))
-
-  combatService.attack(Attack(Dragon(), 100))
-
-  println(putMetrics.map)
-
-
 }
